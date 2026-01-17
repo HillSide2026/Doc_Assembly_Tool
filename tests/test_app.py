@@ -17,8 +17,9 @@ class AppTestCase(unittest.TestCase):
         app_module.OUTPUT_DIR.mkdir(exist_ok=True)
         self.template_dir = Path(self.temp_dir.name) / "templates"
         self.template_dir.mkdir(exist_ok=True)
-        app_module.TEMPLATE_DIR = self.template_dir
-        self._create_template(self.template_dir / "engagement_template.docx")
+        app_module.TEMPLATES_DIR = self.template_dir
+        for template_name in sorted(set(app_module.TEMPLATE_MAP.values())):
+            self._create_template(self.template_dir / template_name)
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -78,11 +79,9 @@ class AppTestCase(unittest.TestCase):
             "/generate",
             data={
                 "client_name": "Jordan",
-                "client_type": "Corporation",
-                "instructing_officer_name": "Taylor",
-                "matter_type": "Hourly Strategy",
-                "retainer_amount": "5000",
-                "payment_method": "authorize credit card",
+                "client_type": "Individual",
+                "matter_type": "Hourly Solution",
+                "payment_method": "pay on invoice",
                 "matter_description": "business acquisition",
             },
         )
@@ -90,6 +89,25 @@ class AppTestCase(unittest.TestCase):
         response.close()
         output_files = list(app_module.OUTPUT_DIR.glob("Jordan.docx"))
         self.assertEqual(len(output_files), 1)
+
+    def test_invalid_submission_returns_debug_message(self):
+        response = self.client.post(
+            "/generate",
+            data={
+                "client_name": "Morgan",
+                "client_type": "Corporation",
+                "matter_type": "Hourly Solution",
+                "payment_method": "authorize credit card",
+                "matter_description": "business acquisition",
+                "instructing_officer_name": "Taylor",
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+        body = response.get_data(as_text=True)
+        self.assertIn("Template not found.", body)
+        self.assertIn(f"template_path: {app_module.TEMPLATES_DIR / 'UNKNOWN'}", body)
+        self.assertIn("available_templates:", body)
+        self.assertIn("received_values:", body)
 
 
 if __name__ == "__main__":
