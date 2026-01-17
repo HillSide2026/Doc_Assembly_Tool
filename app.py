@@ -7,9 +7,22 @@ from flask import Flask, render_template, request, send_file
 from storage import engagement_artifacts
 
 app = Flask(__name__)
-OUTPUT_DIR = Path(__file__).resolve().parent / "output"
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
-TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+TEMPLATE_MAP = {
+    ("Individual", "Hourly Solution", "pay on invoice"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
+    ("Individual", "Hourly Strategy", "pay on invoice"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
+    ("Individual", "Hourly Solution", "authorize credit card"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
+    ("Individual", "Hourly Strategy", "authorize credit card"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
+    ("Individual", "Flat", "retainer"): "RETAINERAgreement_Individual_v1.docx",
+    ("Individual", "Hourly Solution", "retainer"): "RETAINERAgreement_Individual_v1.docx",
+    ("Individual", "Hourly Strategy", "retainer"): "RETAINERAgreement_Individual_v1.docx",
+    ("Corporation", "Flat", "retainer"): "RETAINERAgreement_Corporation_v1.docx",
+    ("Corporation", "Hourly Solution", "retainer"): "RETAINERAgreement_Corporation_v1.docx",
+    ("Corporation", "Hourly Strategy", "retainer"): "RETAINERAgreement_Corporation_v1.docx",
+}
 
 
 @app.route("/")
@@ -45,14 +58,29 @@ def generate_document():
     if matter_type == "Hourly Strategy" and not retainer_amount:
         return "Retainer amount is required for Hourly Strategy matters.", 400
 
-    engagement_template = TEMPLATE_DIR / "engagement_template.docx"
-    retainer_template = TEMPLATE_DIR / "retainer_template.docx"
-    template_path = engagement_template
-    if payment_method == "retainer" and retainer_template.exists():
-        template_path = retainer_template
+    template_key = (client_type, matter_type, payment_method)
+    template_filename = TEMPLATE_MAP.get(template_key)
+    template_path = TEMPLATES_DIR / template_filename if template_filename else None
 
-    if not template_path.exists():
-        return "Template not found.", 500
+    if not template_filename or not template_path.exists():
+        available_templates = sorted(p.name for p in TEMPLATES_DIR.glob("*.docx"))
+        received_values = {
+            "client_name": client_name,
+            "client_type": client_type,
+            "matter_type": matter_type,
+            "payment_method": payment_method,
+            "matter_description": matter_description,
+            "instructing_officer_name": instructing_officer_name,
+            "retainer_amount": retainer_amount,
+        }
+        missing_path = template_path or (TEMPLATES_DIR / "UNKNOWN")
+        message = (
+            "Template not found.\n"
+            f"template_path: {missing_path}\n"
+            f"available_templates: {available_templates}\n"
+            f"received_values: {received_values}\n"
+        )
+        return message, 404
 
     replacements = {
         "client_name": client_name or "N/A",
