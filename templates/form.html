@@ -12,18 +12,87 @@
       <form action="/generate" method="post">
         <div>
           <label for="client_name">Client name</label>
-          <input id="client_name" name="client_name" type="text" />
+          <input id="client_name" name="client_name" type="text" required />
         </div>
         <div>
-          <label for="matter">Matter</label>
-          <input id="matter" name="matter" type="text" />
+          <label for="client_type">Client type</label>
+          <select id="client_type" name="client_type" required>
+            <option value="" disabled selected>Select an option</option>
+            <option value="Individual">Individual</option>
+            <option value="Corporation">Corporation</option>
+          </select>
+        </div>
+        <div id="instructing_officer_group" hidden>
+          <label for="instructing_officer_name">Instructing officer name</label>
+          <input id="instructing_officer_name" name="instructing_officer_name" type="text" />
         </div>
         <div>
+          <label for="matter_type">Matter type</label>
+          <select id="matter_type" name="matter_type" required>
+            <option value="" disabled selected>Select an option</option>
+            <option value="Flat">Flat</option>
+            <option value="Hourly Solution">Hourly Solution</option>
+            <option value="Hourly Strategy">Hourly Strategy</option>
+          </select>
+        </div>
+        <div id="retainer_amount_group" hidden>
           <label for="retainer_amount">Retainer amount</label>
-          <input id="retainer_amount" name="retainer_amount" type="text" />
+          <input id="retainer_amount" name="retainer_amount" type="number" min="0" step="1" />
+        </div>
+        <div>
+          <label for="payment_method">Payment method</label>
+          <select id="payment_method" name="payment_method" required>
+            <option value="" disabled selected>Select an option</option>
+            <option value="pay on invoice">pay on invoice</option>
+            <option value="authorize credit card">authorize credit card</option>
+            <option value="retainer">retainer</option>
+          </select>
+        </div>
+        <div>
+          <label for="matter_description">Matter description</label>
+          <select id="matter_description" name="matter_description" required>
+            <option value="" disabled selected>Select an option</option>
+            <option value="incorporation">incorporation</option>
+            <option value="shareholder agreement">shareholder agreement</option>
+            <option value="shareholder conflict">shareholder conflict</option>
+            <option value="corporate advisory">corporate advisory</option>
+            <option value="shareholder change">shareholder change</option>
+            <option value="business acquisition">business acquisition</option>
+          </select>
         </div>
         <button type="submit">Generate document</button>
       </form>
     </main>
+    <script>
+      const clientTypeSelect = document.getElementById("client_type");
+      const matterTypeSelect = document.getElementById("matter_type");
+      const instructingGroup = document.getElementById("instructing_officer_group");
+      const instructingInput = document.getElementById("instructing_officer_name");
+      const retainerGroup = document.getElementById("retainer_amount_group");
+      const retainerInput = document.getElementById("retainer_amount");
+
+      const toggleInstructingOfficer = () => {
+        const shouldShow = clientTypeSelect.value === "Corporation";
+        instructingGroup.hidden = !shouldShow;
+        instructingInput.required = shouldShow;
+        if (!shouldShow) {
+          instructingInput.value = "";
+        }
+      };
+
+      const toggleRetainerAmount = () => {
+        const shouldShow = matterTypeSelect.value === "Hourly Strategy";
+        retainerGroup.hidden = !shouldShow;
+        retainerInput.required = shouldShow;
+        if (!shouldShow) {
+          retainerInput.value = "";
+        }
+      };
+
+      clientTypeSelect.addEventListener("change", toggleInstructingOfficer);
+      matterTypeSelect.addEventListener("change", toggleRetainerAmount);
+      toggleInstructingOfficer();
+      toggleRetainerAmount();
+    </script>
   </body>
 </html>
