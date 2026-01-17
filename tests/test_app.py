@@ -2,6 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from docx import Document
+
 import app as app_module
 
 
@@ -13,9 +15,20 @@ class AppTestCase(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         app_module.OUTPUT_DIR = Path(self.temp_dir.name)
         app_module.OUTPUT_DIR.mkdir(exist_ok=True)
+        self.template_dir = Path(self.temp_dir.name) / "templates"
+        self.template_dir.mkdir(exist_ok=True)
+        app_module.TEMPLATE_DIR = self.template_dir
+        self._create_template(self.template_dir / "engagement_template.docx")
 
     def tearDown(self):
         self.temp_dir.cleanup()
+
+    def _create_template(self, path: Path) -> None:
+        document = Document()
+        document.add_paragraph("Client: {{client_name}}")
+        document.add_paragraph("Officer: {{instructing_officer_name}}")
+        document.add_paragraph("Retainer: {{retainer_amount}}")
+        document.save(path)
 
     def test_get_form_contains_fields(self):
         response = self.client.get("/")
@@ -75,7 +88,7 @@ class AppTestCase(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         response.close()
-        output_files = list(app_module.OUTPUT_DIR.glob("document_*.docx"))
+        output_files = list(app_module.OUTPUT_DIR.glob("Jordan.docx"))
         self.assertEqual(len(output_files), 1)
 
 
