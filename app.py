@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import re
 
@@ -11,18 +12,6 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
-TEMPLATE_MAP = {
-    ("Individual", "Hourly Solution", "pay on invoice"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
-    ("Individual", "Hourly Strategy", "pay on invoice"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
-    ("Individual", "Hourly Solution", "authorize credit card"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
-    ("Individual", "Hourly Strategy", "authorize credit card"): "ENGAGEMENTAgreement_Individual_[Hourly].docx",
-    ("Individual", "Flat", "retainer"): "RETAINERAgreement_Individual_v1.docx",
-    ("Individual", "Hourly Solution", "retainer"): "RETAINERAgreement_Individual_v1.docx",
-    ("Individual", "Hourly Strategy", "retainer"): "RETAINERAgreement_Individual_v1.docx",
-    ("Corporation", "Flat", "retainer"): "RETAINERAgreement_Corporation_v1.docx",
-    ("Corporation", "Hourly Solution", "retainer"): "RETAINERAgreement_Corporation_v1.docx",
-    ("Corporation", "Hourly Strategy", "retainer"): "RETAINERAgreement_Corporation_v1.docx",
-}
 
 
 @app.route("/")
@@ -41,6 +30,9 @@ def generate_document():
     matter_description = form_data.get("matter_description", "").strip()
     instructing_officer_name = form_data.get("instructing_officer_name", "").strip()
     retainer_amount = form_data.get("retainer_amount", "").strip()
+    client_type_norm = (client_type or "").strip().lower()
+    matter_type_norm = (matter_type or "").strip().lower()
+    payment_method_norm = (payment_method or "").strip().lower()
 
     if not client_name:
         return "Client name is required.", 400
@@ -58,29 +50,63 @@ def generate_document():
     if matter_type == "Hourly Strategy" and not retainer_amount:
         return "Retainer amount is required for Hourly Strategy matters.", 400
 
-    template_key = (client_type, matter_type, payment_method)
-    template_filename = TEMPLATE_MAP.get(template_key)
-    template_path = TEMPLATES_DIR / template_filename if template_filename else None
+    if payment_method_norm == "retainer":
+        if client_type_norm == "individual":
+            template_filename = "RETAINERAgreement_Individual_v2.docx"
+        elif client_type_norm == "corporation":
+            template_filename = "RETAINERAgreement_Corporation_v2.docx"
+        else:
+            template_filename = None
+    else:
+        if client_type_norm == "individual" and matter_type_norm == "flat":
+            template_filename = "ENGAGEMENTAgreement_Individual_[Flat]_v2.docx"
+        elif client_type_norm == "individual" and matter_type_norm in {
+            "hourly solution",
+            "hourly strategy",
+            "hourly",
+        }:
+            template_filename = "ENGAGEMENTAgreement_Individual_[Hourly]_v2.docx"
+        elif client_type_norm == "corporation":
+            template_filename = "ENGAGEMENTAgreement_Corporation_v2.docx"
+        else:
+            template_filename = None
 
-    if not template_filename or not template_path.exists():
-        available_templates = sorted(p.name for p in TEMPLATES_DIR.glob("*.docx"))
-        received_values = {
-            "client_name": client_name,
-            "client_type": client_type,
-            "matter_type": matter_type,
-            "payment_method": payment_method,
-            "matter_description": matter_description,
-            "instructing_officer_name": instructing_officer_name,
-            "retainer_amount": retainer_amount,
-        }
-        missing_path = template_path or (TEMPLATES_DIR / "UNKNOWN")
+    templates_dir = os.fspath(TEMPLATES_DIR)
+    available_templates = sorted(
+        name
+        for name in os.listdir(templates_dir)
+        if name.lower().endswith(".docx")
+    )
+    received_values = {
+        "client_name": client_name,
+        "client_type": client_type,
+        "matter_type": matter_type,
+        "payment_method": payment_method,
+        "matter_description": matter_description,
+        "instructing_officer_name": instructing_officer_name,
+        "retainer_amount": retainer_amount,
+    }
+
+    if not template_filename:
         message = (
-            "Template not found.\n"
-            f"template_path: {missing_path}\n"
+            "Unsupported selection: "
+            f"client_type={client_type_norm}, "
+            f"matter_type={matter_type_norm}, "
+            f"payment_method={payment_method_norm}\n"
             f"available_templates: {available_templates}\n"
             f"received_values: {received_values}\n"
         )
-        return message, 404
+        return message, 400
+
+    template_path = os.path.join(templates_dir, template_filename)
+    if not os.path.exists(template_path):
+        message = (
+            "Template not found.\n"
+            f"template_path: {template_path}\n"
+            f"available_templates: {available_templates}\n"
+            f"received_values: {received_values}\n"
+        )
+        return message, 500
 
     replacements = {
         "client_name": client_name or "N/A",
